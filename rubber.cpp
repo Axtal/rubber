@@ -44,6 +44,7 @@ struct UserData
     double             ome;          // vibration frequency
     double             sy;           // Stress State
     double             Tf;           // Final time
+    double             ex;
     Vec3_t             L0;           // Initial dimensions
     std::ofstream      oss_ss;       // file for stress strain data
 };
@@ -53,10 +54,18 @@ void Setup (DEM::Domain & Dom, void * UD)
     UserData & dat = (*static_cast<UserData *>(UD));
     if (dat.test=="torsion")
     {
-        //if (Dom.Time>0.5*dat.Tf)
-        //{
-            //dat.p->wzf = false;
-        //}
+        if (Dom.Time>0.5*dat.Tf)
+        {
+            dat.p->w(2)   = 0.0;
+            dat.p->wb(2)  = 0.0;
+            //dat.p->vyf = true;
+            //dat.p->v(1) = 2.0*dat.ex*dat.L0(1)/dat.Tf;
+            //dat.p->xb(1) = dat.p->x(1)-dat.p->v(1)*Dom.Dt;
+            dat.p->FixVeloc(0.0,2.0*dat.ex*dat.L0(1)/dat.Tf,0.0);
+            dat.p->InitializeVelocity(Dom.Dt);
+            //dat.p->wxf  = false;
+            //dat.p->wyf  = false;
+        }
     }
 }
 
@@ -164,6 +173,7 @@ int main(int argc, char **argv) try
     dat.Am   = Am;
     dat.ome  = ome;
     dat.Tf   = Tf;
+    dat.ex   = ex;
     Vec3_t Xmin,Xmax;
     dom.BoundingBox(Xmin,Xmax);
     dat.L0   = Xmax - Xmin;
@@ -178,11 +188,6 @@ int main(int argc, char **argv) try
         dat.p->v = 0.0, ex*dat.L0(1)/Tf, 0.0;
     }
 
-    if (test=="torsion")
-    {
-        dat.p->wzf = true;
-        dat.p->w(2) = ome;
-    }
 
     //set the element properties
     Dict B;
@@ -196,7 +201,19 @@ int main(int argc, char **argv) try
     p = dom.GetParticle (-2);
     p->FixVeloc();
 
+    if (test=="torsion")
+    {
+        dat.p->FixVeloc();
+        //dat.p->wxf  = false;
+        //dat.p->wyf  = false;
+        //dat.p->wzf  = true;
+        dat.p->w(2) = 4*M_PI*ome/Tf;
+        //p->wxf = false;
+        //p->wyf = false;
+    }
+
     //dom.WriteXDMF("rubber");
+    //
 
     dom.Solve (Tf,dt,dtOut, &Setup, &Report, filekey.CStr(), RenderVideo, Nproc);
 }
