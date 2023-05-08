@@ -54,18 +54,24 @@ void Setup (DEM::Domain & Dom, void * UD)
     UserData & dat = (*static_cast<UserData *>(UD));
     if (dat.test=="torsion")
     {
-        if (Dom.Time>0.5*dat.Tf)
+        if (Dom.Time>dat.Tf/3.0&&Dom.Time<=2.0*dat.Tf/3.0)
         {
             dat.p->w(2)   = 0.0;
             dat.p->wb(2)  = 0.0;
             //dat.p->vyf = true;
             //dat.p->v(1) = 2.0*dat.ex*dat.L0(1)/dat.Tf;
             //dat.p->xb(1) = dat.p->x(1)-dat.p->v(1)*Dom.Dt;
-            dat.p->FixVeloc(0.0,2.0*dat.ex*dat.L0(1)/dat.Tf,0.0);
+            dat.p->FixVeloc(0.0,3.0*dat.ex*dat.L0(1)/dat.Tf,0.0);
             dat.p->InitializeVelocity(Dom.Dt);
             //dat.p->wxf  = false;
             //dat.p->wyf  = false;
         }
+        else if (Dom.Time>2.0*dat.Tf/3.0)
+        {
+            dat.p->FixVeloc(0.0,0.0,0.0);
+            dat.p->InitializeVelocity(Dom.Dt);
+        }
+        
     }
 }
 
@@ -207,7 +213,7 @@ int main(int argc, char **argv) try
         //dat.p->wxf  = false;
         //dat.p->wyf  = false;
         //dat.p->wzf  = true;
-        dat.p->w(2) = 4*M_PI*ome/Tf;
+        dat.p->w(2) = 6*M_PI*ome/Tf;
         //p->wxf = false;
         //p->wyf = false;
     }
