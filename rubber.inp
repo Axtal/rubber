@@ -23,6 +23,6 @@ torsion = test:        Type of test (tensile or vibration)
 200      = ny:          ny (irrelevant for spheres)
 2       = nz:          nz (irrelevant for spheres)
 3.0     = rho:         rho
--6.0    = Am:          vibration force amplitude
+30.0    = Am:          vibration force amplitude or angle for displacement
 4.0     = ome:         number of turns in a third of simulation time
 0.7     = ex:          Final strain

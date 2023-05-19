@@ -1,7 +1,6 @@
 /************************************************************************
  * MechSys - Open Library for Mechanical Systems                        *
  * Copyright (C) 2009 Sergio Galindo                                    *
- * Copyright (C) 2013 William Oquendo                                   *
  *                                                                      *
  * This program is free software: you can redistribute it and/or modify *
  * it under the terms of the GNU General Public License as published by *
@@ -61,7 +60,7 @@ void Setup (DEM::Domain & Dom, void * UD)
             //dat.p->vyf = true;
             //dat.p->v(1) = 2.0*dat.ex*dat.L0(1)/dat.Tf;
             //dat.p->xb(1) = dat.p->x(1)-dat.p->v(1)*Dom.Dt;
-            dat.p->FixVeloc(0.0,3.0*dat.ex*dat.L0(1)/dat.Tf,0.0);
+            dat.p->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
             dat.p->InitializeVelocity(Dom.Dt);
             //dat.p->wxf  = false;
             //dat.p->wyf  = false;
