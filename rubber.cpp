@@ -34,7 +34,8 @@ using std::endl;
 
 struct UserData
 {
-    DEM::Particle *    p;            // the array of particles at which the force is to be applied
+    DEM::Particle *    p1;           // the array of particles at which the force is to be applied
+    DEM::Particle *    p2;           // the array of particles at which the force is to be applied
     Array<Vec3_t  >    vm0;          // value of the vectors close to the middle section
     Array<Vec3_t *>    vm;           // pointers to the vectors close to the middle section
     String             test;         // Type of test vibraiton or tension
@@ -55,20 +56,37 @@ void Setup (DEM::Domain & Dom, void * UD)
     {
         if (Dom.Time>dat.Tf/3.0&&Dom.Time<=2.0*dat.Tf/3.0)
         {
-            dat.p->w(2)   = 0.0;
-            dat.p->wb(2)  = 0.0;
+            dat.p1->w(2)   = 0.0;
+            dat.p1->wb(2)  = 0.0;
             //dat.p->vyf = true;
             //dat.p->v(1) = 2.0*dat.ex*dat.L0(1)/dat.Tf;
             //dat.p->xb(1) = dat.p->x(1)-dat.p->v(1)*Dom.Dt;
-            dat.p->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
-            dat.p->InitializeVelocity(Dom.Dt);
+            dat.p1->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
+            dat.p1->InitializeVelocity(Dom.Dt);
             //dat.p->wxf  = false;
             //dat.p->wyf  = false;
+            if (dat.p2!=NULL)
+            {
+                dat.p2->w(2)   = 0.0;
+                dat.p2->wb(2)  = 0.0;
+                //dat.p->vyf = true;
+                //dat.p->v(1) = 2.0*dat.ex*dat.L0(1)/dat.Tf;
+                //dat.p->xb(1) = dat.p->x(1)-dat.p->v(1)*Dom.Dt;
+                dat.p2->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
+                dat.p2->InitializeVelocity(Dom.Dt);
+                //dat.p->wxf  = false;
+                //dat.p->wyf  = false;
+            }
         }
         else if (Dom.Time>2.0*dat.Tf/3.0)
         {
-            dat.p->FixVeloc(0.0,0.0,0.0);
-            dat.p->InitializeVelocity(Dom.Dt);
+            dat.p1->FixVeloc(0.0,0.0,0.0);
+            dat.p1->InitializeVelocity(Dom.Dt);
+            if (dat.p2!=NULL)
+            {
+                dat.p2->FixVeloc(0.0,0.0,0.0);
+                dat.p2->InitializeVelocity(Dom.Dt);
+            }
         }
         
     }
@@ -157,7 +175,37 @@ int main(int argc, char **argv) try
     dom.Alpha = verlet;
     //dom.Dilate= true;
 
-    if (ptype=="voronoi") dom.AddVoroPack (-1, R, Lx,Ly,Lz, nx,ny,nz, rho, true, false, seed, 1.0, Vec3_t(0.9,0.9,0.9));
+    if (ptype=="voronoi") 
+    {
+        dom.AddVoroPack (-1, R, Lx,Ly,Lz, nx,ny,nz, rho, true, false, seed, 1.0, Vec3_t(0.9,0.9,0.9));
+    }
+    if (ptype=="voronoi2") 
+    {
+        dom.AddVoroPack (-4, R, Lx,Ly,Lz, nx,ny,nz, rho, true, false, seed, 1.0, Vec3_t(0.9,0.9,0.9));
+        dom.GenBoundingPlane(-5,R,1.0,true);
+        for (size_t ip=0;ip<dom.Particles.Size();ip++)
+        {
+            if (dom.Particles[ip]->Tag<=-4)
+            {
+                dom.Particles[ip]->Translate(Vec3_t(0.0,0.0, 2.0*Lz+R));
+                dom.Particles[ip]->FixVeloc();
+            }
+        }
+        dom.AddVoroPack (-1, R, Lx,Ly,Lz, nx,ny,nz, rho, true, false, seed, 1.0, Vec3_t(0.9,0.9,0.9));
+        dom.GenBoundingPlane(-2,R,1.0,true);
+        for (size_t ip=0;ip<dom.Particles.Size();ip++)
+        {
+            if (dom.Particles[ip]->Tag==-4)
+            {
+                dom.Particles[ip]->vxf = false;
+                dom.Particles[ip]->vyf = false;
+                dom.Particles[ip]->vzf = false;
+                dom.Particles[ip]->wxf = false;
+                dom.Particles[ip]->wyf = false;
+                dom.Particles[ip]->wzf = false;
+            }
+        }
+    }
     else if (ptype=="cube")
     {
         Mesh::Structured mesh(3);
@@ -183,14 +231,15 @@ int main(int argc, char **argv) try
     dom.BoundingBox(Xmin,Xmax);
     dat.L0   = Xmax - Xmin;
 
-    dom.GenBoundingPlane(-2,R,1.0,true);
+    if (ptype!="voronoi2") dom.GenBoundingPlane(-2,R,1.0,true);
 
     //identify the moving lid
-    dat.p = dom.GetParticle (-3);
+    dat.p1 = dom.GetParticle (-3);
+    if (ptype=="voronoi2") dat.p2 = dom.GetParticle (-6);
     if (test=="tensile")
     {
-        dat.p->FixVeloc();
-        dat.p->v = 0.0, ex*dat.L0(1)/Tf, 0.0;
+        dat.p1->FixVeloc();
+        dat.p1->v = 0.0, ex*dat.L0(1)/Tf, 0.0;
     }
 
 
@@ -199,6 +248,9 @@ int main(int argc, char **argv) try
     B.Set(-1,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
     B.Set(-2,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
     B.Set(-3,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
+    B.Set(-4,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
+    B.Set(-5,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
+    B.Set(-6,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
     dom.SetProps(B);
 
     // fix -2 particles at the left extreme of the beam
@@ -208,17 +260,22 @@ int main(int argc, char **argv) try
 
     if (test=="torsion")
     {
-        dat.p->FixVeloc();
+        dat.p1->FixVeloc();
         //dat.p->wxf  = false;
         //dat.p->wyf  = false;
         //dat.p->wzf  = true;
-        dat.p->w(2) = 6*M_PI*ome/Tf;
+        dat.p1->w(2) = 6*M_PI*ome/Tf;
         //p->wxf = false;
         //p->wyf = false;
+        if (dat.p2!=NULL) 
+        {
+            dat.p2->FixVeloc();
+            dat.p2->w(2) = 6*M_PI*ome/Tf;
+        }
     }
 
     //dom.WriteXDMF("rubber");
-    //
+    
 
     dom.Solve (Tf,dt,dtOut, &Setup, &Report, filekey.CStr(), RenderVideo, Nproc);
 }
