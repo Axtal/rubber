@@ -54,40 +54,86 @@ void Setup (DEM::Domain & Dom, void * UD)
     UserData & dat = (*static_cast<UserData *>(UD));
     if (dat.test=="torsion")
     {
-        if (Dom.Time>dat.Tf/3.0&&Dom.Time<=2.0*dat.Tf/3.0)
+        double ome    = dat.ome*2.0*M_PI/dat.Tf*(tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf)));
+        dat.p1->w (2)  = ome;
+        dat.p1->wb(2)  = ome;
+        if (dat.p2!=NULL)
         {
-            dat.p1->w(2)   = 0.0;
-            dat.p1->wb(2)  = 0.0;
+            dat.p2->w (2)  = ome;
+            dat.p2->wb(2)  = ome;
+        }
+        if (Dom.Time>0.5*dat.Tf)
+        {
+            dat.p1->vxf = false;
+            dat.p1->vyf = false;
+            dat.p1->vzf = false;
+            dat.p1->wxf = false;
+            dat.p1->wyf = false;
+            if (dat.p2!=NULL)
+            {
+                dat.p2->vxf = false;
+                dat.p2->vyf = false;
+                dat.p2->vzf = false;
+                dat.p2->wxf = false;
+                dat.p2->wyf = false;
+                double Am = dat.Am*tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf));
+                double r0 = Dom.Particles[0]->Dmax*2.0/sqrt(3.0);
+                #pragma omp parallel for schedule(static) num_threads(Dom.Nproc)
+                for (size_t n=0;n<Dom.ListPosPairs.Size();n++)
+                {
+                    size_t i = Dom.ListPosPairs[n].first;
+                    size_t j = Dom.ListPosPairs[n].second;
+                    bool pi_has_vf = !Dom.Particles[i]->IsFree();
+                    bool pj_has_vf = !Dom.Particles[j]->IsFree();
+                    double r = DEM::Distance(Dom.Particles[i]->x,Dom.Particles[j]->x);
+                    if ( pi_has_vf || pj_has_vf || (r>2*r0) || (r<r0)) continue;
+                    double r6 = pow((r0/r),6.0);
+                    Vec3_t n = (Dom.Particles[i]->x - Dom.Particles[j]->x)/r;
+                    Vec3_t F = Am/r*r6*(1.0-r6)*n;
+
+                    omp_set_lock  (&Dom.Particles[i]->lck);
+                    Dom.Particles[i]->F -= F;
+                    omp_unset_lock(&Dom.Particles[i]->lck);
+                    omp_set_lock  (&Dom.Particles[j]->lck);
+                    Dom.Particles[j]->F += F;
+                    omp_unset_lock(&Dom.Particles[j]->lck);
+                }
+            }
+        }
+        //if (Dom.Time>dat.Tf/3.0&&Dom.Time<=2.0*dat.Tf/3.0)
+        //{
+            //dat.p1->w(2)   = 0.0;
+            //dat.p1->wb(2)  = 0.0;
             //dat.p->vyf = true;
             //dat.p->v(1) = 2.0*dat.ex*dat.L0(1)/dat.Tf;
             //dat.p->xb(1) = dat.p->x(1)-dat.p->v(1)*Dom.Dt;
-            dat.p1->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
-            dat.p1->InitializeVelocity(Dom.Dt);
+            //dat.p1->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
+            //dat.p1->InitializeVelocity(Dom.Dt);
             //dat.p->wxf  = false;
             //dat.p->wyf  = false;
-            if (dat.p2!=NULL)
-            {
-                dat.p2->w(2)   = 0.0;
-                dat.p2->wb(2)  = 0.0;
+            //if (dat.p2!=NULL)
+            //{
+                //dat.p2->w(2)   = 0.0;
+                //dat.p2->wb(2)  = 0.0;
                 //dat.p->vyf = true;
                 //dat.p->v(1) = 2.0*dat.ex*dat.L0(1)/dat.Tf;
                 //dat.p->xb(1) = dat.p->x(1)-dat.p->v(1)*Dom.Dt;
-                dat.p2->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
-                dat.p2->InitializeVelocity(Dom.Dt);
+                //dat.p2->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.Am*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.Am*M_PI/180.0),0.0);
+                //dat.p2->InitializeVelocity(Dom.Dt);
                 //dat.p->wxf  = false;
                 //dat.p->wyf  = false;
-            }
-        }
-        else if (Dom.Time>2.0*dat.Tf/3.0)
-        {
-            dat.p1->FixVeloc(0.0,0.0,0.0);
-            dat.p1->InitializeVelocity(Dom.Dt);
-            if (dat.p2!=NULL)
-            {
-                dat.p2->FixVeloc(0.0,0.0,0.0);
-                dat.p2->InitializeVelocity(Dom.Dt);
-            }
-        }
+            //}
+        //}
+        //else if (Dom.Time>2.0*dat.Tf/3.0)
+        //{
+            //dat.p1->FixVeloc(0.0,0.0,0.0);
+            //dat.p1->InitializeVelocity(Dom.Dt);
+            //if (dat.p2!=NULL)
+            //{
+                //dat.p2->FixVeloc(0.0,0.0,0.0);
+                //dat.p2->InitializeVelocity(Dom.Dt);
+            //}
+        //}
         
     }
 }
@@ -187,7 +233,7 @@ int main(int argc, char **argv) try
         {
             if (dom.Particles[ip]->Tag<=-4)
             {
-                dom.Particles[ip]->Translate(Vec3_t(0.0,0.0, 2.0*Lz+R));
+                dom.Particles[ip]->Translate(Vec3_t(0.0,0.0, sqrt(2.0)*Lz));
                 dom.Particles[ip]->FixVeloc();
             }
         }
@@ -264,13 +310,13 @@ int main(int argc, char **argv) try
         //dat.p->wxf  = false;
         //dat.p->wyf  = false;
         //dat.p->wzf  = true;
-        dat.p1->w(2) = 6*M_PI*ome/Tf;
+        //dat.p1->w(2) = 6*M_PI*ome/Tf;
         //p->wxf = false;
         //p->wyf = false;
         if (dat.p2!=NULL) 
         {
             dat.p2->FixVeloc();
-            dat.p2->w(2) = 6*M_PI*ome/Tf;
+            //dat.p2->w(2) = 6*M_PI*ome/Tf;
         }
     }
 
