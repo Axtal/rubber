@@ -35,6 +35,7 @@ using std::endl;
 struct UserData
 {
     Array<DEM::Particle *> p;        // the array of particles at which the force is to be applied;
+    Array<DEM::Particle *> e;        // the array of particles which are fixed;
     String             test;         // Type of test vibraiton or tension
     double             A;            // Area of the plate for stress calculation
     double             Am;           // vibration amplitude
@@ -55,8 +56,10 @@ void Setup (DEM::Domain & Dom, void * UD)
         double ome    = dat.ome*4.0*M_PI/dat.Tf*(tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf)));
         for (size_t ip=0;ip<dat.p.Size();ip++)
         {
-            dat.p[ip]-> w (2)  = ome;
-            dat.p[ip]-> wb(2)  = ome;
+            dat.p[ip]-> w (2)  = 0.5*ome;
+            dat.p[ip]-> wb(2)  = 0.5*ome;
+            dat.e[ip]-> w (2)  = 0.5*ome;
+            dat.e[ip]-> wb(2)  = 0.5*ome;
         }
         if (Dom.Time>0.5*dat.Tf)
         {
@@ -67,6 +70,14 @@ void Setup (DEM::Domain & Dom, void * UD)
                 dat.p[ip]->vzf = false;
                 dat.p[ip]->wxf = false;
                 dat.p[ip]->wyf = false;
+                //dat.p[ip]->wzf = false;
+
+                dat.e[ip]->vxf = false;
+                dat.e[ip]->vyf = false;
+                dat.e[ip]->vzf = false;
+                dat.e[ip]->wxf = false;
+                dat.e[ip]->wyf = false;
+                //dat.e[ip]->wzf = false;
             }
             double Am = dat.Am*tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf));
             double r0 = Dom.Particles[0]->Dmax*2.0/sqrt(3.0);
@@ -211,6 +222,7 @@ int main(int argc, char **argv) try
             }
             dom.GenBoundingPlane(-3*ns-1,-3*ns,R,1.0,true);
             dat.p.Push(dom.GetParticle(-3*ns-2));
+            dat.e.Push(dom.GetParticle(-3*ns-1));
             dom.GetParticle(-3*ns-1)->FixVeloc();
             dom.GetParticle(-3*ns-2)->FixVeloc();
         }
