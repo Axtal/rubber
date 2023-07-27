@@ -1,6 +1,6 @@
 0.05     = Verlet:      Verlet distance for optimization
-voronoi  = ptype:       Particle type (voronoi, sphere,rice and tetrahedra mesh so far)
-torque   = test:        Type of test (tensile or vibration)
+voronoi  = ptype:       Particle type (voronoi so far)
+torque   = test:        Type of test (torsion or torque)
 2        = RenderVideo: 1 if video should be render, 0 otherwise
 5.0e4    = Kn:          Normal stiffness
 5.0e4    = Kt:          Tangential stiffness
@@ -28,4 +28,4 @@ torque   = test:        Type of test (tensile or vibration)
 4.0      = ome:         number of turns in a third of simulation time
 0.7      = ex:          Final strain
 20.0     = theta:       Angle of final strain
-2000.0     = Ft:          Force producing torque for torque controlled twisting
+2000.0   = Ft:          Force producing torque for torque controlled twisting
