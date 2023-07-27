@@ -44,6 +44,8 @@ struct UserData
     double             Tf;           // Final time
     double             ex;           // Finlat strain
     double             theta;        // Angle of deflection
+    double             Ft;           // Force for torque induced twisting
+    double             omecum=0.0;   // Cummulative twisting
     Vec3_t             L0;           // Initial dimensions
     std::ofstream      oss_ss;       // file for stress strain data
 };
@@ -51,74 +53,144 @@ struct UserData
 void Setup (DEM::Domain & Dom, void * UD)
 {
     UserData & dat = (*static_cast<UserData *>(UD));
-    if (dat.p.Size()>1)
+    if (dat.test=="torsion")
     {
-        double ome    = dat.ome*4.0*M_PI/dat.Tf*(tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf)));
-        for (size_t ip=0;ip<dat.p.Size();ip++)
+        if (dat.p.Size()>1)
         {
-            dat.p[ip]-> w (2)  = 0.5*ome;
-            dat.p[ip]-> wb(2)  = 0.5*ome;
-            dat.e[ip]-> w (2)  = 0.5*ome;
-            dat.e[ip]-> wb(2)  = 0.5*ome;
-        }
-        if (Dom.Time>0.5*dat.Tf)
-        {
+            double ome    = dat.ome*4.0*M_PI/dat.Tf*(tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf)));
             for (size_t ip=0;ip<dat.p.Size();ip++)
             {
-                dat.p[ip]->vxf = false;
-                dat.p[ip]->vyf = false;
-                dat.p[ip]->vzf = false;
-                dat.p[ip]->wxf = false;
-                dat.p[ip]->wyf = false;
-                //dat.p[ip]->wzf = false;
-
-                dat.e[ip]->vxf = false;
-                dat.e[ip]->vyf = false;
-                dat.e[ip]->vzf = false;
-                dat.e[ip]->wxf = false;
-                dat.e[ip]->wyf = false;
-                //dat.e[ip]->wzf = false;
+                dat.p[ip]-> w (2)  = 0.5*ome;
+                dat.p[ip]-> wb(2)  = 0.5*ome;
+                dat.e[ip]-> w (2)  = 0.5*ome;
+                dat.e[ip]-> wb(2)  = 0.5*ome;
             }
-            double Am = dat.Am*tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf));
-            double r0 = Dom.Particles[0]->Dmax*2.0/sqrt(3.0);
-            #pragma omp parallel for schedule(static) num_threads(Dom.Nproc)
-            for (size_t n=0;n<Dom.ListPosPairs.Size();n++)
+            if (Dom.Time>0.5*dat.Tf)
             {
-                size_t i = Dom.ListPosPairs[n].first;
-                size_t j = Dom.ListPosPairs[n].second;
-                bool pi_has_vf = !Dom.Particles[i]->IsFree();
-                bool pj_has_vf = !Dom.Particles[j]->IsFree();
-                bool same_tag  = Dom.Particles[i]->Tag==Dom.Particles[j]->Tag;
-                double r = DEM::Distance(Dom.Particles[i]->x,Dom.Particles[j]->x);
-                if ( pi_has_vf || pj_has_vf || (r>2*r0) || (r<r0) || same_tag) continue;
-                double r6 = pow((r0/r),6.0);
-                Vec3_t n = (Dom.Particles[i]->x - Dom.Particles[j]->x)/r;
-                Vec3_t F = Am/r*r6*(1.0-r6)*n;
+                for (size_t ip=0;ip<dat.p.Size();ip++)
+                {
+                    dat.p[ip]->vxf = false;
+                    dat.p[ip]->vyf = false;
+                    dat.p[ip]->vzf = false;
+                    dat.p[ip]->wxf = false;
+                    dat.p[ip]->wyf = false;
+                    //dat.p[ip]->wzf = false;
 
-                omp_set_lock  (&Dom.Particles[i]->lck);
-                Dom.Particles[i]->F -= F;
-                omp_unset_lock(&Dom.Particles[i]->lck);
-                omp_set_lock  (&Dom.Particles[j]->lck);
-                Dom.Particles[j]->F += F;
-                omp_unset_lock(&Dom.Particles[j]->lck);
+                    dat.e[ip]->vxf = false;
+                    dat.e[ip]->vyf = false;
+                    dat.e[ip]->vzf = false;
+                    dat.e[ip]->wxf = false;
+                    dat.e[ip]->wyf = false;
+                    //dat.e[ip]->wzf = false;
+                }
+                double Am = dat.Am*tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf));
+                double r0 = Dom.Particles[0]->Dmax*2.0/sqrt(3.0);
+                #pragma omp parallel for schedule(static) num_threads(Dom.Nproc)
+                for (size_t n=0;n<Dom.ListPosPairs.Size();n++)
+                {
+                    size_t i = Dom.ListPosPairs[n].first;
+                    size_t j = Dom.ListPosPairs[n].second;
+                    bool pi_has_vf = !Dom.Particles[i]->IsFree();
+                    bool pj_has_vf = !Dom.Particles[j]->IsFree();
+                    bool same_tag  = Dom.Particles[i]->Tag==Dom.Particles[j]->Tag;
+                    double r = DEM::Distance(Dom.Particles[i]->x,Dom.Particles[j]->x);
+                    if ( pi_has_vf || pj_has_vf || (r>2*r0) || (r<r0) || same_tag) continue;
+                    double r6 = pow((r0/r),6.0);
+                    Vec3_t n = (Dom.Particles[i]->x - Dom.Particles[j]->x)/r;
+                    Vec3_t F = Am/r*r6*(1.0-r6)*n;
+
+                    omp_set_lock  (&Dom.Particles[i]->lck);
+                    Dom.Particles[i]->F -= F;
+                    omp_unset_lock(&Dom.Particles[i]->lck);
+                    omp_set_lock  (&Dom.Particles[j]->lck);
+                    Dom.Particles[j]->F += F;
+                    omp_unset_lock(&Dom.Particles[j]->lck);
+                }
+            }
+        }
+        else 
+        {
+            double ome = dat.ome*6.0*M_PI/dat.Tf*(tanh((Dom.Time-dat.Tf/3.0)/(0.1*dat.Tf)));
+            if (Dom.Time>dat.Tf/3.0) ome = 0.0;
+            dat.p[0]->w (2)  = ome;
+            dat.p[0]->wb(2)  = ome;
+            if (Dom.Time>dat.Tf/3.0&&Dom.Time<=2.0*dat.Tf/3.0)
+            {
+                dat.p[0]->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.theta*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.theta*M_PI/180.0),0.0);
+                dat.p[0]->InitializeVelocity(Dom.Dt);
+            }
+            else if (Dom.Time>2.0*dat.Tf/3.0)
+            {
+                dat.p[0]->FixVeloc(0.0,0.0,0.0);
+                dat.p[0]->InitializeVelocity(Dom.Dt);
             }
         }
     }
-    else 
+    else if (dat.test=="torque")
     {
-        double ome = dat.ome*6.0*M_PI/dat.Tf*(tanh((Dom.Time-dat.Tf/3.0)/(0.1*dat.Tf)));
-        if (Dom.Time>dat.Tf/3.0) ome = 0.0;
-        dat.p[0]->w (2)  = ome;
-        dat.p[0]->wb(2)  = ome;
-        if (Dom.Time>dat.Tf/3.0&&Dom.Time<=2.0*dat.Tf/3.0)
+        if (dat.p.Size()>1)
         {
-            dat.p[0]->FixVeloc(3.0*dat.ex*dat.L0(1)/dat.Tf*sin(dat.theta*M_PI/180.0),3.0*dat.ex*dat.L0(1)/dat.Tf*cos(dat.theta*M_PI/180.0),0.0);
-            dat.p[0]->InitializeVelocity(Dom.Dt);
-        }
-        else if (Dom.Time>2.0*dat.Tf/3.0)
-        {
-            dat.p[0]->FixVeloc(0.0,0.0,0.0);
-            dat.p[0]->InitializeVelocity(Dom.Dt);
+            if (Dom.Time<=0.5*dat.Tf)
+            {
+                double torque = dat.Ft*0.5*sqrt(dat.A)*tanh((Dom.Time)/(0.1*dat.Tf));
+                for (size_t ip=0;ip<dat.p.Size();ip++)
+                {
+                    dat.p[ip]->wzf = false;
+                    dat.e[ip]->wzf = false;
+                    dat.p[ip]->Tf(2) = 0.5*torque-0.01*dat.p[ip]->I(2)*dat.p[ip]->w(2);
+                    dat.e[ip]->Tf(2) = 0.5*torque-0.01*dat.e[ip]->I(2)*dat.e[ip]->w(2);
+                }
+                dat.omecum += 0.5*(dat.p[0]->w(2) + dat.e[0]->w(2))*Dom.Dt;
+            }
+            else
+            {
+                for (size_t ip=0;ip<dat.p.Size();ip++)
+                {
+                    dat.p[ip]->vxf = false;
+                    dat.p[ip]->vyf = false;
+                    dat.p[ip]->vzf = false;
+                    dat.p[ip]->wxf = false;
+                    dat.p[ip]->wyf = false;
+                    dat.p[ip]->wzf = true;
+
+                    dat.e[ip]->vxf = false;
+                    dat.e[ip]->vyf = false;
+                    dat.e[ip]->vzf = false;
+                    dat.e[ip]->wxf = false;
+                    dat.e[ip]->wyf = false;
+                    dat.e[ip]->wzf = true;
+
+
+                    double ome     = -2.0*dat.omecum/dat.Tf*(tanh((Dom.Time-0.5*dat.Tf)/(0.01*dat.Tf)));
+                    dat.p[ip]-> w (2)  = ome;
+                    dat.p[ip]-> wb(2)  = ome;
+                    dat.e[ip]-> w (2)  = ome;
+                    dat.e[ip]-> wb(2)  = ome;
+                }
+                double Am = dat.Am*tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf));
+                double r0 = Dom.Particles[0]->Dmax*2.0/sqrt(3.0);
+                #pragma omp parallel for schedule(static) num_threads(Dom.Nproc)
+                for (size_t n=0;n<Dom.ListPosPairs.Size();n++)
+                {
+                    size_t i = Dom.ListPosPairs[n].first;
+                    size_t j = Dom.ListPosPairs[n].second;
+                    bool pi_has_vf = !Dom.Particles[i]->IsFree();
+                    bool pj_has_vf = !Dom.Particles[j]->IsFree();
+                    bool same_tag  = Dom.Particles[i]->Tag==Dom.Particles[j]->Tag;
+                    double r = DEM::Distance(Dom.Particles[i]->x,Dom.Particles[j]->x);
+                    if ( pi_has_vf || pj_has_vf || (r>2*r0) || (r<r0) || same_tag) continue;
+                    double r6 = pow((r0/r),6.0);
+                    Vec3_t n = (Dom.Particles[i]->x - Dom.Particles[j]->x)/r;
+                    Vec3_t F = Am/r*r6*(1.0-r6)*n;
+
+                    omp_set_lock  (&Dom.Particles[i]->lck);
+                    Dom.Particles[i]->F -= F;
+                    omp_unset_lock(&Dom.Particles[i]->lck);
+                    omp_set_lock  (&Dom.Particles[j]->lck);
+                    Dom.Particles[j]->F += F;
+                    omp_unset_lock(&Dom.Particles[j]->lck);
+                }
+            }
         }
     }
 }
@@ -169,6 +241,7 @@ int main(int argc, char **argv) try
     double ome;         // Frequency of vibration or number of torsion cycles
     double ex;          // Final strain for the tensile test (positive extension, negative compression)
     double theta;       // Angle of deflection for strain tests
+    double Ft;          // Force producing torque for torque controlled twisting
     {
         infile >> verlet;       infile.ignore(200,'\n');
         infile >> ptype;        infile.ignore(200,'\n');
@@ -200,6 +273,7 @@ int main(int argc, char **argv) try
         infile >> ome;          infile.ignore(200,'\n');
         infile >> ex;           infile.ignore(200,'\n');
         infile >> theta;        infile.ignore(200,'\n');
+        infile >> Ft;           infile.ignore(200,'\n');
     }
 
 
@@ -237,6 +311,7 @@ int main(int argc, char **argv) try
     dat.Tf   = Tf;
     dat.ex   = ex;
     dat.theta= theta;
+    dat.Ft   = Ft;
     Vec3_t Xmin,Xmax;
     dom.BoundingBox(Xmin,Xmax);
     dat.L0   = Xmax - Xmin;
