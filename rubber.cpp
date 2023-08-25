@@ -128,68 +128,66 @@ void Setup (DEM::Domain & Dom, void * UD)
     }
     else if (dat.test=="torque")
     {
-        if (dat.p.Size()>1)
+        if (Dom.Time<=0.5*dat.Tf)
         {
-            if (Dom.Time<=0.5*dat.Tf)
+            double torque = dat.Ft*0.5*sqrt(dat.A)*tanh((Dom.Time)/(0.1*dat.Tf));
+            for (size_t ip=0;ip<dat.p.Size();ip++)
             {
-                double torque = dat.Ft*0.5*sqrt(dat.A)*tanh((Dom.Time)/(0.1*dat.Tf));
-                for (size_t ip=0;ip<dat.p.Size();ip++)
-                {
-                    dat.p[ip]->wzf = false;
-                    dat.e[ip]->wzf = false;
-                    dat.p[ip]->Tf(2) = 0.5*torque-0.01*dat.p[ip]->I(2)*dat.p[ip]->w(2);
-                    dat.e[ip]->Tf(2) = 0.5*torque-0.01*dat.e[ip]->I(2)*dat.e[ip]->w(2);
-                }
-                dat.omecum += 0.5*(dat.p[0]->w(2) + dat.e[0]->w(2))*Dom.Dt;
+                dat.p[ip]->wzf = false;
+                dat.e[ip]->wzf = false;
+                dat.p[ip]->Tf(2) = 0.5*torque-0.01*dat.p[ip]->I(2)*dat.p[ip]->w(2);
+                dat.e[ip]->Tf(2) = 0.5*torque-0.01*dat.e[ip]->I(2)*dat.e[ip]->w(2);
             }
-            else
+            dat.omecum += 0.5*(dat.p[0]->w(2) + dat.e[0]->w(2))*Dom.Dt;
+        }
+        else
+        {
+            for (size_t ip=0;ip<dat.p.Size();ip++)
             {
-                for (size_t ip=0;ip<dat.p.Size();ip++)
-                {
-                    dat.p[ip]->vxf = false;
-                    dat.p[ip]->vyf = false;
-                    dat.p[ip]->vzf = false;
-                    dat.p[ip]->wxf = false;
-                    dat.p[ip]->wyf = false;
-                    dat.p[ip]->wzf = true;
+                dat.p[ip]->vxf = false;
+                dat.p[ip]->vyf = false;
+                dat.p[ip]->vzf = false;
+                dat.p[ip]->wxf = false;
+                dat.p[ip]->wyf = false;
+                dat.p[ip]->wzf = true;
 
-                    dat.e[ip]->vxf = false;
-                    dat.e[ip]->vyf = false;
-                    dat.e[ip]->vzf = false;
-                    dat.e[ip]->wxf = false;
-                    dat.e[ip]->wyf = false;
-                    dat.e[ip]->wzf = true;
+                dat.e[ip]->vxf = false;
+                dat.e[ip]->vyf = false;
+                dat.e[ip]->vzf = false;
+                dat.e[ip]->wxf = false;
+                dat.e[ip]->wyf = false;
+                dat.e[ip]->wzf = true;
 
 
-                    double ome     = -2.0*dat.omecum/dat.Tf*(tanh((Dom.Time-0.5*dat.Tf)/(0.01*dat.Tf)));
-                    dat.p[ip]-> w (2)  = ome;
-                    dat.p[ip]-> wb(2)  = ome;
-                    dat.e[ip]-> w (2)  = ome;
-                    dat.e[ip]-> wb(2)  = ome;
-                }
-                double Am = dat.Am*tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf));
-                double r0 = Dom.Particles[0]->Dmax*2.0/sqrt(3.0);
-                #pragma omp parallel for schedule(static) num_threads(Dom.Nproc)
-                for (size_t n=0;n<Dom.ListPosPairs.Size();n++)
-                {
-                    size_t i = Dom.ListPosPairs[n].first;
-                    size_t j = Dom.ListPosPairs[n].second;
-                    bool pi_has_vf = !Dom.Particles[i]->IsFree();
-                    bool pj_has_vf = !Dom.Particles[j]->IsFree();
-                    bool same_tag  = Dom.Particles[i]->Tag==Dom.Particles[j]->Tag;
-                    double r = DEM::Distance(Dom.Particles[i]->x,Dom.Particles[j]->x);
-                    if ( pi_has_vf || pj_has_vf || (r>2*r0) || (r<r0) || same_tag) continue;
-                    double r6 = pow((r0/r),6.0);
-                    Vec3_t n = (Dom.Particles[i]->x - Dom.Particles[j]->x)/r;
-                    Vec3_t F = Am/r*r6*(1.0-r6)*n;
+                double ome     = -2.0*dat.omecum/dat.Tf*(tanh((Dom.Time-0.5*dat.Tf)/(0.01*dat.Tf)));
+                dat.p[ip]-> w (2)  = ome;
+                dat.p[ip]-> wb(2)  = ome;
+                dat.e[ip]-> w (2)  = ome;
+                dat.e[ip]-> wb(2)  = ome;
+            }
+            double Am = dat.Am*tanh((Dom.Time-0.5*dat.Tf)/(0.1*dat.Tf));
+            double r0 = Dom.Particles[0]->Dmax*2.0/sqrt(3.0);
+            #pragma omp parallel for schedule(static) num_threads(Dom.Nproc)
+            for (size_t n=0;n<Dom.ListPosPairs.Size();n++)
+            {
+                size_t i = Dom.ListPosPairs[n].first;
+                size_t j = Dom.ListPosPairs[n].second;
+                bool pi_has_vf = !Dom.Particles[i]->IsFree();
+                bool pj_has_vf = !Dom.Particles[j]->IsFree();
+                //bool same_tag  = Dom.Particles[i]->Tag==Dom.Particles[j]->Tag;
+                double r = DEM::Distance(Dom.Particles[i]->x,Dom.Particles[j]->x);
+                //if ( pi_has_vf || pj_has_vf || (r>2*r0) || (r<r0) || same_tag) continue;
+                if ( pi_has_vf || pj_has_vf || (r>2*r0) || (r<r0)) continue;
+                double r6 = pow((r0/r),6.0);
+                Vec3_t n = (Dom.Particles[i]->x - Dom.Particles[j]->x)/r;
+                Vec3_t F = Am/r*r6*(1.0-r6)*n;
 
-                    omp_set_lock  (&Dom.Particles[i]->lck);
-                    Dom.Particles[i]->F -= F;
-                    omp_unset_lock(&Dom.Particles[i]->lck);
-                    omp_set_lock  (&Dom.Particles[j]->lck);
-                    Dom.Particles[j]->F += F;
-                    omp_unset_lock(&Dom.Particles[j]->lck);
-                }
+                omp_set_lock  (&Dom.Particles[i]->lck);
+                Dom.Particles[i]->F -= F;
+                omp_unset_lock(&Dom.Particles[i]->lck);
+                omp_set_lock  (&Dom.Particles[j]->lck);
+                Dom.Particles[j]->F += F;
+                omp_unset_lock(&Dom.Particles[j]->lck);
             }
         }
     }
@@ -297,8 +295,11 @@ int main(int argc, char **argv) try
             dom.GenBoundingPlane(-3*ns-1,-3*ns,R,1.0,true);
             dat.p.Push(dom.GetParticle(-3*ns-2));
             dat.e.Push(dom.GetParticle(-3*ns-1));
-            dom.GetParticle(-3*ns-1)->FixVeloc();
-            dom.GetParticle(-3*ns-2)->FixVeloc();
+            if (Ns>1)
+            {
+                dom.GetParticle(-3*ns-1)->FixVeloc();
+                dom.GetParticle(-3*ns-2)->FixVeloc();
+            }
         }
     }
     else throw new Fatal("Packing for particle type not implemented yet");
