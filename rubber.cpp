@@ -215,6 +215,7 @@ int main(int argc, char **argv) try
     size_t RenderVideo; // Decide if video should be rendered
     double Kn;          // Normal stiffness
     double Kt;          // Tangential stiffness
+    double Gv;          // Fluid viscosity
     double Gn;          // Normal dissipative coefficient
     double Gt;          // Tangential dissipative coefficient
     double Mu;          // Microscopic friction coefficient
@@ -247,6 +248,7 @@ int main(int argc, char **argv) try
         infile >> RenderVideo;  infile.ignore(200,'\n');
         infile >> Kn;           infile.ignore(200,'\n');
         infile >> Kt;           infile.ignore(200,'\n');
+        infile >> Gv;           infile.ignore(200,'\n');
         infile >> Gn;           infile.ignore(200,'\n');
         infile >> Gt;           infile.ignore(200,'\n');
         infile >> Mu;           infile.ignore(200,'\n');
@@ -322,9 +324,9 @@ int main(int argc, char **argv) try
     Dict B;
     for (size_t ns=0;ns<Ns;ns++)
     {
-        B.Set(-3*ns  ,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
-        B.Set(-3*ns-1,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
-        B.Set(-3*ns-2,"Kn Kt Bn Bt Bm Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gn ,Gt ,Mu ,Eps);
+        B.Set(-3*ns  ,"Kn Kt Bn Bt Bm Gv Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,Gv ,Gn ,Gt ,Mu ,Eps);
+        B.Set(-3*ns-1,"Kn Kt Bn Bt Bm Gv Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,0.0,Gn ,Gt ,Mu ,Eps);
+        B.Set(-3*ns-2,"Kn Kt Bn Bt Bm Gv Gn Gt Mu Eps",Kn ,Kt ,Bn ,Bt ,Bm ,0.0,Gn ,Gt ,Mu ,Eps);
     }
     dom.SetProps(B);
 
